@@ -34,22 +34,24 @@ import PictureList from "@/components/PictureList.vue";
 import UserList from "@/components/UserList.vue";
 import MyDivider from "@/components/MyDivider.vue";
 import myAxios from "@/plugins/myAxios";
+import { message } from "ant-design-vue";
 
 const router = useRouter();
 const route = useRoute();
+
+//路由信息
+const activeKey = route.params.category;
 
 /**
  * 初始化搜索参数
  */
 const initSearchParams = {
+  type: activeKey,
   //搜索的参数
   text: "",
   current: 1, //分页
   pageSize: 10,
 };
-
-//路由信息
-const activeKey = route.params.category;
 
 //ref 引用数据类型
 const searchParams = ref(initSearchParams);
@@ -60,45 +62,46 @@ const userList = ref([]);
 const pictureList = ref([]);
 
 /**
- * 监听搜索的参数是否变化：
- */
-watchEffect(() => {
-  searchParams.value = {
-    ...initSearchParams,
-    text: route.query.text, //从请求路径中拿数据
-  } as any;
-});
-
-/**
  * 进行数据的加载：
  * @param params
  */
-const loadData = (params: any) => {
+const loadDataOld = (params: any) => {
+  //查询参数：
+  const postQuery = {
+    ...params,
+    searchText: params.text,
+  };
+  myAxios.post("/post/list/page/vo", postQuery).then((res: any) => {
+    postList.value = res.records;
+  });
+
+  const userQuery = {
+    ...params,
+    userName: params.text,
+  };
+  myAxios.post("/user/list/page/vo", userQuery).then((res: any) => {
+    userList.value = res.records;
+  });
+
+  const pictureQuery = {
+    ...params,
+    searchText: params.text,
+  };
+  myAxios.post("/picture/list/page/vo", pictureQuery).then((res: any) => {
+    pictureList.value = res.records;
+  });
+};
+
+/**
+ * 发送所有请求
+ * @param params
+ */
+const loadAllData = (params: any) => {
   //查询参数：
   const query = {
     ...params,
     searchText: params.text,
   };
-  // myAxios.post("/post/list/page/vo", postQuery).then((res: any) => {
-  //   postList.value = res.records;
-  // });
-  //
-  // const userQuery = {
-  //   ...params,
-  //   userName: params.text,
-  // };
-  // myAxios.post("/user/list/page/vo", userQuery).then((res: any) => {
-  //   userList.value = res.records;
-  // });
-  //
-  // const pictureQuery = {
-  //   ...params,
-  //   searchText: params.text,
-  // };
-  // myAxios.post("/picture/list/page/vo", pictureQuery).then((res: any) => {
-  //   pictureList.value = res.records;
-  // });
-
   //聚合搜索,后端聚合的接口：
   myAxios.post("/search/all", query).then((res: any) => {
     postList.value = res.postVOList;
@@ -106,6 +109,49 @@ const loadData = (params: any) => {
     pictureList.value = res.pictureVOList;
   });
 };
+
+/**
+ * 加载单类的数据：
+ * @param params
+ */
+const loadData = (params: any) => {
+  const { type } = params;
+
+  if (!type) {
+    message.error("请求类型为空");
+    return;
+  }
+
+  //查询参数：
+  const query = {
+    ...params,
+    searchText: params.text,
+  };
+  //聚合搜索,后端聚合的接口：
+  myAxios.post("/search/all", query).then((res: any) => {
+    if (type === "post") {
+      postList.value = res.postVOList;
+    } else if (type === "user") {
+      userList.value = res.userVOList;
+    } else if (type === "picture") {
+      pictureList.value = res.pictureVOList;
+    }
+  });
+};
+
+/**
+ * 监听搜索的参数是否变化：
+ */
+watchEffect(() => {
+  searchParams.value = {
+    ...initSearchParams,
+    type: route.params.category, //请求类型；
+    text: route.query.text, //从请求路径中拿数据
+  } as any;
+
+  //触发单次加载：
+  loadData(searchParams.value);
+});
 
 //首次加载，仅加载一次：
 onMounted(() => {
